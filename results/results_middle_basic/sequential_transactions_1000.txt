@@ -1,0 +1,56 @@
+Requests      [total, rate, throughput]         16255, 951.30, 0.00
+Duration      [total, attack, wait]             22.842s, 17.087s, 5.755s
+Latencies     [min, mean, 50, 90, 95, 99, max]  506.6µs, 1.094s, 46.623ms, 4.186s, 5.186s, 5.91s, 7.208s
+Bytes In      [total, mean]                     278660, 17.14
+Bytes Out     [total, mean]                     0, 0.00
+Success       [ratio]                           0.00%
+Status Codes  [code:count]                      0:47  404:16208  
+Error Set:
+404 Not Found
+Get "http://localhost:8081/tx/by-block/26113/1": dial tcp 0.0.0.0:0->[::1]:8081: connectex: No connection could be made because the target machine actively refused it.
+Get "http://localhost:8081/tx/by-block/26113/3": dial tcp 0.0.0.0:0->[::1]:8081: connectex: No connection could be made because the target machine actively refused it.
+Get "http://localhost:8081/tx/by-block/26113/6": dial tcp 0.0.0.0:0->127.0.0.1:8081: connectex: No connection could be made because the target machine actively refused it.
+Get "http://localhost:8081/tx/by-block/26113/7": dial tcp 0.0.0.0:0->[::1]:8081: connectex: No connection could be made because the target machine actively refused it.
+Get "http://localhost:8081/tx/by-block/26113/9": dial tcp 0.0.0.0:0->127.0.0.1:8081: connectex: No connection could be made because the target machine actively refused it.
+Get "http://localhost:8081/tx/by-block/26113/10": dial tcp 0.0.0.0:0->[::1]:8081: connectex: No connection could be made because the target machine actively refused it.
+Get "http://localhost:8081/tx/by-block/26113/12": dial tcp 0.0.0.0:0->127.0.0.1:8081: connectex: No connection could be made because the target machine actively refused it.
+Get "http://localhost:8081/tx/by-block/26113/14": dial tcp 0.0.0.0:0->127.0.0.1:8081: connectex: No connection could be made because the target machine actively refused it.
+Get "http://localhost:8081/tx/by-block/26113/13": dial tcp 0.0.0.0:0->[::1]:8081: connectex: No connection could be made because the target machine actively refused it.
+Get "http://localhost:8081/tx/by-block/26613/53": dial tcp 0.0.0.0:0->[::1]:8081: connectex: No connection could be made because the target machine actively refused it.
+Get "http://localhost:8081/tx/by-block/26113/15": dial tcp 0.0.0.0:0->127.0.0.1:8081: connectex: No connection could be made because the target machine actively refused it.
+Get "http://localhost:8081/tx/by-block/26613/55": dial tcp 0.0.0.0:0->[::1]:8081: connectex: No connection could be made because the target machine actively refused it.
+Get "http://localhost:8081/tx/by-block/26613/59": dial tcp 0.0.0.0:0->[::1]:8081: connectex: No connection could be made because the target machine actively refused it.
+Get "http://localhost:8081/tx/by-block/26613/60": dial tcp 0.0.0.0:0->127.0.0.1:8081: connectex: No connection could be made because the target machine actively refused it.
+Get "http://localhost:8081/tx/by-block/26613/63": dial tcp 0.0.0.0:0->127.0.0.1:8081: connectex: No connection could be made because the target machine actively refused it.
+Get "http://localhost:8081/tx/by-block/26613/64": dial tcp 0.0.0.0:0->127.0.0.1:8081: connectex: No connection could be made because the target machine actively refused it.
+Get "http://localhost:8081/tx/by-block/26613/67": dial tcp 0.0.0.0:0->127.0.0.1:8081: connectex: No connection could be made because the target machine actively refused it.
+Get "http://localhost:8081/tx/by-block/26613/72": dial tcp 0.0.0.0:0->[::1]:8081: connectex: No connection could be made because the target machine actively refused it.
+Get "http://localhost:8081/tx/by-block/26613/71": dial tcp 0.0.0.0:0->127.0.0.1:8081: connectex: No connection could be made because the target machine actively refused it.
+Get "http://localhost:8081/tx/by-block/26613/70": dial tcp 0.0.0.0:0->127.0.0.1:8081: connectex: No connection could be made because the target machine actively refused it.
+Get "http://localhost:8081/tx/by-block/26613/69": dial tcp 0.0.0.0:0->127.0.0.1:8081: connectex: No connection could be made because the target machine actively refused it.
+Get "http://localhost:8081/tx/by-block/26613/73": dial tcp 0.0.0.0:0->[::1]:8081: connectex: No connection could be made because the target machine actively refused it.
+Get "http://localhost:8081/tx/by-block/26613/79": dial tcp 0.0.0.0:0->127.0.0.1:8081: connectex: No connection could be made because the target machine actively refused it.
+Get "http://localhost:8081/tx/by-block/26613/76": dial tcp 0.0.0.0:0->[::1]:8081: connectex: No connection could be made because the target machine actively refused it.
+Get "http://localhost:8081/tx/by-block/26613/75": dial tcp 0.0.0.0:0->127.0.0.1:8081: connectex: No connection could be made because the target machine actively refused it.
+Get "http://localhost:8081/tx/by-block/26613/94": dial tcp 0.0.0.0:0->[::1]:8081: connectex: No connection could be made because the target machine actively refused it.
+Get "http://localhost:8081/tx/by-block/26613/96": dial tcp 0.0.0.0:0->127.0.0.1:8081: connectex: No connection could be made because the target machine actively refused it.
+Get "http://localhost:8081/tx/by-block/26613/95": dial tcp 0.0.0.0:0->127.0.0.1:8081: connectex: No connection could be made because the target machine actively refused it.
+Get "http://localhost:8081/tx/by-block/26613/97": dial tcp 0.0.0.0:0->[::1]:8081: connectex: No connection could be made because the target machine actively refused it.
+Get "http://localhost:8081/tx/by-block/26613/99": dial tcp 0.0.0.0:0->127.0.0.1:8081: connectex: No connection could be made because the target machine actively refused it.
+Get "http://localhost:8081/tx/by-block/26613/103": dial tcp 0.0.0.0:0->[::1]:8081: connectex: No connection could be made because the target machine actively refused it.
+Get "http://localhost:8081/tx/by-block/26613/104": dial tcp 0.0.0.0:0->[::1]:8081: connectex: No connection could be made because the target machine actively refused it.
+Get "http://localhost:8081/tx/by-block/26613/106": dial tcp 0.0.0.0:0->[::1]:8081: connectex: No connection could be made because the target machine actively refused it.
+Get "http://localhost:8081/tx/by-block/26613/105": dial tcp 0.0.0.0:0->[::1]:8081: connectex: No connection could be made because the target machine actively refused it.
+Get "http://localhost:8081/tx/by-block/26613/107": dial tcp 0.0.0.0:0->127.0.0.1:8081: connectex: No connection could be made because the target machine actively refused it.
+Get "http://localhost:8081/tx/by-block/26613/108": dial tcp 0.0.0.0:0->127.0.0.1:8081: connectex: No connection could be made because the target machine actively refused it.
+Get "http://localhost:8081/tx/by-block/26613/109": dial tcp 0.0.0.0:0->127.0.0.1:8081: connectex: No connection could be made because the target machine actively refused it.
+Get "http://localhost:8081/tx/by-block/26613/110": dial tcp 0.0.0.0:0->127.0.0.1:8081: connectex: No connection could be made because the target machine actively refused it.
+Get "http://localhost:8081/tx/by-block/26613/113": dial tcp 0.0.0.0:0->[::1]:8081: connectex: No connection could be made because the target machine actively refused it.
+Get "http://localhost:8081/tx/by-block/26613/116": dial tcp 0.0.0.0:0->127.0.0.1:8081: connectex: No connection could be made because the target machine actively refused it.
+Get "http://localhost:8081/tx/by-block/26613/120": dial tcp 0.0.0.0:0->[::1]:8081: connectex: No connection could be made because the target machine actively refused it.
+Get "http://localhost:8081/tx/by-block/26613/117": dial tcp 0.0.0.0:0->127.0.0.1:8081: connectex: No connection could be made because the target machine actively refused it.
+Get "http://localhost:8081/tx/by-block/26613/121": dial tcp 0.0.0.0:0->[::1]:8081: connectex: No connection could be made because the target machine actively refused it.
+Get "http://localhost:8081/tx/by-block/26613/119": dial tcp 0.0.0.0:0->[::1]:8081: connectex: No connection could be made because the target machine actively refused it.
+Get "http://localhost:8081/tx/by-block/26613/118": dial tcp 0.0.0.0:0->[::1]:8081: connectex: No connection could be made because the target machine actively refused it.
+Get "http://localhost:8081/tx/by-block/26613/123": dial tcp 0.0.0.0:0->[::1]:8081: connectex: No connection could be made because the target machine actively refused it.
+Get "http://localhost:8081/tx/by-block/26613/122": dial tcp 0.0.0.0:0->127.0.0.1:8081: connectex: No connection could be made because the target machine actively refused it.
