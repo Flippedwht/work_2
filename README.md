@@ -14,13 +14,15 @@ loader 		 json格式定义
 metrics 	 监视器（已废弃）
 skiplist 	 动态跳表设计
 storage 	 大块存储设计
+```
+其余文件夹
+```
 reslut 		 为vegeta测试结果
 targets		 为vegeta测试目标
 test 		 文件夹为开发过程中测试文件，可忽略
 tools		 为生成测试文件代码，可直接运行
 .bat 		 文件为测试脚本
 ```
-
 运行过程——
 
 1、运行tools文件夹下的测试数据生成代码
