@@ -1,0 +1,15 @@
+Requests      [total, rate, throughput]         90006, 1946.29, 1906.96
+Duration      [total, attack, wait]             47.195s, 46.245s, 950.08ms
+Latencies     [min, mean, 50, 90, 95, 99, max]  507.6µs, 58.948ms, 4.536ms, 99.838ms, 532.441ms, 874.203ms, 4.707s
+Bytes In      [total, mean]                     11821515, 131.34
+Bytes Out     [total, mean]                     0, 0.00
+Success       [ratio]                           99.99%
+Status Codes  [code:count]                      0:7  200:89999  
+Error Set:
+Get "http://localhost:8081/tx/by-block/9986/29": dial tcp 0.0.0.0:0->127.0.0.1:8081: connectex: No connection could be made because the target machine actively refused it.
+Get "http://localhost:8081/tx/by-block/9992/26": dial tcp 0.0.0.0:0->127.0.0.1:8081: connectex: No connection could be made because the target machine actively refused it.
+Get "http://localhost:8081/tx/by-block/9983/0": dial tcp 0.0.0.0:0->[::1]:8081: connectex: No connection could be made because the target machine actively refused it.
+Get "http://localhost:8081/tx/by-block/804/3": dial tcp 0.0.0.0:0->[::1]:8081: connectex: No connection could be made because the target machine actively refused it.
+Get "http://localhost:8081/tx/by-block/9994/18": dial tcp 0.0.0.0:0->127.0.0.1:8081: connectex: No connection could be made because the target machine actively refused it.
+Get "http://localhost:8081/tx/by-block/9995/4": dial tcp 0.0.0.0:0->127.0.0.1:8081: connectex: No connection could be made because the target machine actively refused it.
+Get "http://localhost:8081/tx/by-block/9993/7": dial tcp 0.0.0.0:0->[::1]:8081: connectex: No connection could be made because the target machine actively refused it.

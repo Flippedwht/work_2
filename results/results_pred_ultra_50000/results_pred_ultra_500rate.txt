@@ -1,0 +1,9 @@
+Requests      [total, rate, throughput]         29995, 499.92, 499.90
+Duration      [total, attack, wait]             1m0s, 1m0s, 623.4µs
+Latencies     [min, mean, 50, 90, 95, 99, max]  623.4µs, 1.1ms, 1.064ms, 1.666ms, 1.992ms, 2.727ms, 23.664ms
+Bytes In      [total, mean]                     4517582, 150.61
+Bytes Out     [total, mean]                     0, 0.00
+Success       [ratio]                           100.00%
+Status Codes  [code:count]                      0:1  200:29994  
+Error Set:
+Get "http://localhost:8080/tx?tx=tx7418_24": EOF

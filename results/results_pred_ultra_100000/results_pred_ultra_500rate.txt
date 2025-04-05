@@ -1,0 +1,10 @@
+Requests      [total, rate, throughput]         30000, 499.91, 499.87
+Duration      [total, attack, wait]             1m0s, 1m0s, 605.9µs
+Latencies     [min, mean, 50, 90, 95, 99, max]  534.8µs, 1.287ms, 1.118ms, 2.049ms, 2.225ms, 2.873ms, 39.959ms
+Bytes In      [total, mean]                     4534388, 151.15
+Bytes Out     [total, mean]                     0, 0.00
+Success       [ratio]                           99.99%
+Status Codes  [code:count]                      0:2  200:29998  
+Error Set:
+Get "http://localhost:8080/tx?tx=tx100000_79": EOF
+Get "http://localhost:8080/tx?tx=tx100000_96": EOF

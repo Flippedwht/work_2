@@ -41,8 +41,8 @@ type Block struct {
 }
 
 const (
-	NumBlocks   = 10000 // 生成 10 万个区块
-	FlushPeriod = 1000  // 每 1000 个区块输出进度
+	NumBlocks   = 100000 // 生成 10 万个区块
+	FlushPeriod = 1000   // 每 1000 个区块输出进度
 )
 
 func main() {
@@ -75,6 +75,22 @@ func main() {
 	blockHeaderDir := filepath.Join(blockchainDir, "block_header")
 	os.MkdirAll(blockHeaderDir, os.ModePerm)
 
+	// **交易记录**
+	transactions := []map[string]string{}
+
+	// **冷热用户设置**
+	hotUserCount := 30  // 30个热用户
+	coldUserCount := 70 // 70个冷用户
+	hotUsers := make([]string, hotUserCount)
+	coldUsers := make([]string, coldUserCount)
+
+	for i := 0; i < hotUserCount; i++ {
+		hotUsers[i] = fmt.Sprintf("user_%d", i)
+	}
+	for i := 0; i < coldUserCount; i++ {
+		coldUsers[i] = fmt.Sprintf("user_%d", hotUserCount+i)
+	}
+
 	// **记录初始内存占用**
 	var startMem runtime.MemStats
 	runtime.ReadMemStats(&startMem)
@@ -104,14 +120,23 @@ func main() {
 		var blockHeaderFilePath string
 
 		for j := 0; j < txCount; j++ {
+			var fromUser string
+			var tx_order string //记录json文件需要
+			if rand.Float64() < 0.7 {
+				fromUser = hotUsers[rand.Intn(hotUserCount)]
+			} else {
+				fromUser = coldUsers[rand.Intn(coldUserCount)]
+			}
+
 			tx := Transaction{
-				From:   fmt.Sprintf("user_%d", rand.Intn(100)),
+				From:   fromUser,
 				To:     fmt.Sprintf("user_%d", rand.Intn(100)),
 				Amount: uint64(rand.Intn(10000)),
 				Gas:    uint64(rand.Intn(1000)),
 			}
 
 			// **计算交易哈希**
+			tx_order = fmt.Sprintf("tx%d_%d", i, j)
 			txHash := sha256.Sum256([]byte(fmt.Sprintf("%s:%s:%d:%d", tx.From, tx.To, tx.Amount, i)))
 			txHashStr := hex.EncodeToString(txHash[:])
 			tx.TXID = txHashStr
@@ -127,6 +152,12 @@ func main() {
 			txIndexKey := fmt.Sprintf("txIndex:%s", txHashStr)
 			txIndexValue := fmt.Sprintf("%s:%d", parentHash, j)
 			db.Put([]byte(txIndexKey), []byte(txIndexValue), nil)
+
+			// **记录交易信息**
+			transactions = append(transactions, map[string]string{
+				"from":   fromUser,
+				"txHash": tx_order,
+			})
 		}
 
 		// 计算交易根哈希
@@ -190,6 +221,17 @@ func main() {
 			fmt.Printf("已生成 %d 个区块\n", i)
 		}
 	}
+
+	// **保存交易数据**
+	transactionFilePath := "E:/VScode_project/work_2/transactions_basic.json"
+	transactionFile, err := os.Create(transactionFilePath)
+	if err != nil {
+		log.Fatalf("无法创建交易 JSON 文件: %v", err)
+	}
+	defer transactionFile.Close()
+
+	transactionData, _ := json.MarshalIndent(transactions, "", "  ")
+	transactionFile.Write(transactionData)
 
 	// **统计结果**
 	writeElapsed := time.Since(writeStartTime)

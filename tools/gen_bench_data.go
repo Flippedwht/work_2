@@ -2,6 +2,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"math/rand"
@@ -17,9 +18,20 @@ import (
 )
 
 const (
-	NumBlocks   = 50000 // 生成 5 万个区块
-	FlushPeriod = 50    // 每 50 个区块合并写入
+	NumBlocks   = 100000 // 生成 5 万个区块
+	FlushPeriod = 3      // 每 50 个区块合并写入
 )
+
+// 用户特征
+type UserProfile struct {
+	UserID        string
+	QueryCount    int
+	LastQueryTime time.Time
+	QueryHistory  map[string]int  // 按小时统计查询次数 ("YYYY-MM-DD HH" -> count)
+	DailyPattern  map[int]float64 // 24 小时模式 ("小时" -> 平均查询次数)
+	// 计算过去 7 天每小时的平均查询次数，找出用户的查询高峰
+	QuerySequence []string // 记录用户最近查询的交易 ID
+}
 
 func main() {
 	rand.Seed(time.Now().UnixNano()) // 确保每次运行生成不同数据
@@ -57,19 +69,33 @@ func main() {
 	go monitorCPUUsage()
 	go monitorMemoryUsage()
 
+	blocks := []*block.Block{}            // **额外维护区块列表**
+	transactions := []map[string]string{} // **单独记录交易数据**
+
 	// 生成 NumBlocks 个区块
 	for i := uint64(1); i <= NumBlocks; i++ {
-		txCount := 30
+		txCount := 100
 		txs := make([]block.Transaction, txCount)
 
 		for j := 0; j < txCount; j++ {
+			fromUser := generateUser()
+			txHash := fmt.Sprintf("tx%d_%d", i, j) // 交易哈希
+
 			txs[j] = block.Transaction{
-				TXID:   fmt.Sprintf("tx%d_%d", i, j), // 交易ID格式: tx{区块号}_{交易序号}
-				From:   fmt.Sprintf("user_%d", rand.Intn(100)),
+				TXID:   txHash,
+				From:   fromUser,
 				To:     fmt.Sprintf("user_%d", rand.Intn(100)),
 				Amount: uint64(rand.Intn(10000)),
 				Gas:    uint64(rand.Intn(1000)),
 			}
+
+			updateUserProfile(s, fromUser, txHash) // 传入 userID 和 txHash
+
+			// **记录交易信息**
+			transactions = append(transactions, map[string]string{
+				"txHash": txHash,
+				"from":   fromUser,
+			})
 		}
 
 		// 创建区块
@@ -79,23 +105,26 @@ func main() {
 			Transactions: txs,
 		}
 
-		// 添加区块到当前 Chunk 缓冲区
+		// 添加区块到存储
 		s.AddBlock(b)
-
-		// 计算数据大小（近似计算）
-		blockSize := int64(100 + len(txs)*64) // 近似计算一个区块的大小（假设区块头 100 字节，每笔交易 64 字节）
-		totalSize += blockSize
+		blocks = append(blocks, b) // **记录区块数据**
+		//统计一下大小
+		blockBytes, _ := json.Marshal(b) // 序列化区块
+		blockSize := int64(len(blockBytes))
+		totalSize += blockSize // 累加数据大小
 
 		// 每 FlushPeriod 个区块强制写入一次数据库
 		if i%FlushPeriod == 0 {
 			s.Flush()
-			fmt.Printf("✅ 已生成 %d 个区块，数据写入中...\n", i)
+			fmt.Printf("已生成 %d 个区块，数据写入中...\n", i)
 		}
 	}
 
 	// **最后一次 Flush，确保数据完整**
 	s.Flush()
 	writeElapsed := time.Since(writeStartTime)
+	// **保存交易数据**
+	saveTransactionData(transactions, "E:\\VScode_project\\work_2\\transactions.json")
 
 	// **统计吞吐量**
 	elapsed := time.Since(startTime)
@@ -159,4 +188,56 @@ func getCPUUsage() float64 {
 		return 0.00
 	}
 	return percentages[0] // 返回 CPU 总使用率
+}
+
+func generateUser() string {
+	if rand.Float64() < 0.3 {
+		return fmt.Sprintf("user_%d", rand.Intn(10)) // 30% 生成热用户
+	}
+	return fmt.Sprintf("user_%d", rand.Intn(90)+10) // 70% 生成冷用户
+}
+
+func updateUserProfile(cs *storage.ChunkStorage, userID, txHash string) {
+	key := []byte(fmt.Sprintf("user_profile:%s", userID))
+	data, err := cs.GetDB().Get(key, nil) // 直接调用 GetDB() 访问 LevelDB
+	var profile UserProfile
+
+	if err == nil {
+		_ = json.Unmarshal(data, &profile)
+	} else {
+		profile = UserProfile{
+			UserID:        userID,
+			QueryCount:    0, //  生成测试数据时，不增加查询次数
+			QueryHistory:  make(map[string]int),
+			DailyPattern:  make(map[int]float64),
+			QuerySequence: []string{},
+		}
+	}
+
+	// **只记录交易，不增加查询次数**
+	profile.QuerySequence = append(profile.QuerySequence, txHash)
+	if len(profile.QuerySequence) > 10 {
+		profile.QuerySequence = profile.QuerySequence[1:] // 只保留最近 10 条查询
+	}
+
+	// 存入 LevelDB
+	data, _ = json.Marshal(profile)
+	if err := cs.GetDB().Put(key, data, nil); err != nil {
+		fmt.Printf("[ERROR] 用户数据写入失败: %v\n", err)
+	} // 直接操作 LevelDB
+}
+
+func saveTransactionData(transactions []map[string]string, outputPath string) {
+	data, err := json.MarshalIndent(transactions, "", "  ")
+	if err != nil {
+		fmt.Printf("交易数据序列化失败: %v\n", err)
+		return
+	}
+
+	err = os.WriteFile(outputPath, data, 0644)
+	if err != nil {
+		fmt.Printf("交易数据写入失败: %v\n", err)
+		return
+	}
+
 }

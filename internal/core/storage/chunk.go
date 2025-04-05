@@ -24,7 +24,18 @@ const (
 	CacheSize          = 128             // 缓存128个最近访问的chunk
 	BlockCacheSize     = 1024            // 额外缓存1024个单独的区块
 	TxCacheSize        = 2048            // 额外缓存2048个交易
+	UserHotThreshold   = 10              // 设定查询次数超过10次的用户为热用户
 )
+
+// UserProfile 结构体
+type UserProfile struct {
+	UserID        string
+	QueryCount    int             // 总查询次数（历史累计）
+	LastQueryTime time.Time       // 最近一次查询时间
+	QueryHistory  map[string]int  // 滑动窗口（小时统计）
+	DailyPattern  map[int]float64 // 过去 7 天每小时平均查询次数（SMA）
+	QuerySequence []string        // 记录用户最近查询的交易 ID
+}
 
 // **缓存交易和所在区块**
 type TxCacheEntry struct {
@@ -251,53 +262,89 @@ func (cs *ChunkStorage) GetBlockByTxHash(txHash string) ([]byte, []byte, error) 
 	cs.mu.RLock()
 	defer cs.mu.RUnlock()
 
-	// 1. 优先查询 txCache
+	// **1. 查询 TxCache（LRU 缓存）**
 	if entry, ok := cs.txCache.Get(txHash); ok {
-		blockData, _ := json.Marshal(entry.Block) // 交易所在区块
-		txData, _ := json.Marshal(entry.Tx)       // 交易本身
+		cs.UpdateUserProfile(entry.Tx.From, txHash)
+
+		blockData, err := json.Marshal(entry.Block)
+		if err != nil {
+			return nil, nil, fmt.Errorf("block marshal failed: %w", err)
+		}
+		txData, err := json.Marshal(entry.Tx)
+		if err != nil {
+			return nil, nil, fmt.Errorf("tx marshal failed: %w", err)
+		}
 		return blockData, txData, nil
 	}
 
-	// 2. 通过 LevelDB 索引查找该交易所属的 ChunkID
+	// **2. 查询 LevelDB 获取 ChunkID**
 	txKey := []byte(fmt.Sprintf("tx_index:%s", txHash))
 	chunkIDBytes, err := cs.db.Get(txKey, nil)
 	if err != nil {
-		log.Printf("查询交易 %s 的索引失败: %v", txHash, err)
 		return nil, nil, fmt.Errorf("tx index lookup failed: %w", err)
 	}
 	chunkID, _ := strconv.ParseUint(string(chunkIDBytes), 10, 64)
 
-	// 3. 加载对应的 Chunk
+	// **3. 加载 Chunk**
 	chunk, err := cs.loadChunk(chunkID)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to load chunk: %w", err)
 	}
 
-	// 4. 利用 Chunk 内预构建的交易偏移索引，直接定位目标交易
+	// **4. 利用 Chunk 内的交易偏移索引，直接查找交易**
 	offset, ok := chunk.TxOffsets[txHash]
 	if !ok {
 		return nil, nil, errors.New("transaction not found in tx_offsets")
 	}
 
+	// **5. 先查询跳表，看看是否已经缓存了这个区块**
+	if node := cs.skipList.Search(offset.BlockNumber); node != nil {
+		// **跳表命中**
+		blockData, err := json.Marshal(node.Block)
+		if err != nil {
+			return nil, nil, fmt.Errorf("block marshal failed: %w", err)
+		}
+		tx := node.Block.Transactions[offset.TxIndex]
+		txData, err := json.Marshal(tx)
+		if err != nil {
+			return nil, nil, fmt.Errorf("tx marshal failed: %w", err)
+		}
+		// **缓存交易**
+		cs.txCache.Add(txHash, &TxCacheEntry{Tx: &tx, Block: node.Block})
+		return blockData, txData, nil
+	}
+
+	// **6. 跳表未命中，从 Chunk 加载区块**
 	targetBlock, exists := chunk.Blocks[offset.BlockNumber]
 	if !exists {
 		return nil, nil, errors.New("block not found in chunk")
 	}
 
-	// 校验交易索引有效性
+	// **7. 校验交易索引**
 	if offset.TxIndex < 0 || offset.TxIndex >= len(targetBlock.Transactions) {
 		return nil, nil, errors.New("invalid transaction index")
 	}
 	tx := targetBlock.Transactions[offset.TxIndex]
 
-	// 5. 缓存查找到的交易信息，以便下次直接命中
-	cs.txCache.Add(txHash, &TxCacheEntry{
-		Tx:    &tx,
-		Block: targetBlock,
-	})
-	// 同时，将目标 Block 插入跳表，方便后续区块查询
-	cs.skipList.Insert(targetBlock.Number, targetBlock)
+	// **8. 缓存查找到的交易 & 区块**
+	cs.txCache.Add(txHash, &TxCacheEntry{Tx: &tx, Block: targetBlock})
+	cs.skipList.Insert(targetBlock.Number, targetBlock) // **插入跳表**
 
+	// **9. 更新用户查询行为**
+	cs.UpdateUserProfile(tx.From, txHash)
+
+	// **10. 触发 Lookahead 预加载**
+	if cs.IsHotUser(tx.From) || cs.IsCyclicHotUser(tx.From) {
+		cs.PreloadUserTransactions(tx.From)
+	}
+
+	// **11. 预测用户下一次可能查询的交易**
+	if predictedTx := cs.PredictNextQuery(tx.From); predictedTx != "" {
+		fmt.Printf("预测用户 %s 可能查询: %s\n", tx.From, predictedTx)
+		cs.PreloadUserTransactions(predictedTx) // 预加载预测的交易
+	}
+
+	// **12. 返回交易 & 区块数据**
 	blockData, _ := json.Marshal(targetBlock)
 	txData, _ := json.Marshal(tx)
 	return blockData, txData, nil
@@ -389,4 +436,235 @@ func LoadTestBlocksFromDir(dir string) ([]*block.Block, error) {
 		}
 	}
 	return blocks, nil
+}
+
+// 更新用户查询行为
+func (cs *ChunkStorage) UpdateUserProfile(userID, txHash string) {
+	key := []byte(fmt.Sprintf("user_profile:%s", userID))
+
+	data, err := cs.db.Get(key, nil)
+	var profile UserProfile
+	if err == nil {
+		_ = json.Unmarshal(data, &profile)
+	} else {
+		profile = UserProfile{
+			UserID:        userID,
+			QueryCount:    0,
+			QueryHistory:  make(map[string]int),
+			DailyPattern:  make(map[int]float64),
+			QuerySequence: []string{},
+		}
+	}
+
+	// **记录当前小时查询次数**
+	currentHour := time.Now().Format("2006-01-02 15")
+	profile.QueryHistory[currentHour]++
+	profile.QueryCount++
+	profile.LastQueryTime = time.Now()
+
+	// **移除超出滑动窗口范围的数据**
+	windowSize := 24 // 24 小时
+	profile = pruneOldHistory(profile, windowSize)
+
+	// **计算过去 7 天的 SMA 识别周期性查询**
+	profile = computeDailyPattern(profile, 7)
+
+	// **更新用户查询序列（最多存 10 次，FIFO 方式）**
+	profile.QuerySequence = append(profile.QuerySequence, txHash)
+	if len(profile.QuerySequence) > 10 {
+		profile.QuerySequence = profile.QuerySequence[1:] // 只保留最近 10 条查询
+	}
+
+	// **存入 LevelDB**
+	data, _ = json.Marshal(profile)
+	_ = cs.db.Put(key, data, nil)
+
+	// **调用马尔可夫预测，看看是否能预测下一个查询**
+	if predictedTx := cs.PredictNextQuery(userID); predictedTx != "" {
+		fmt.Printf("🔮 预测用户 %s 可能查询: %s\n", userID, predictedTx)
+	}
+}
+
+// 计算周期性查询模式 - SMA
+func computeDailyPattern(profile UserProfile, days int) UserProfile {
+	hourlyCounts := make(map[int][]int) // 记录每个小时的查询次数
+
+	// 遍历历史查询数据
+	for timestamp, count := range profile.QueryHistory {
+		t, err := time.Parse("2006-01-02 15", timestamp)
+		if err == nil {
+			hour := t.Hour()
+			hourlyCounts[hour] = append(hourlyCounts[hour], count)
+		}
+	}
+
+	// 计算每个小时的平均查询次数
+	for hour, counts := range hourlyCounts {
+		total := 0
+		for _, c := range counts {
+			total += c
+		}
+		profile.DailyPattern[hour] = float64(total) / float64(len(counts)) // 计算均值
+	}
+
+	return profile
+}
+
+// 移除超出时间窗口的数据
+func pruneOldHistory(profile UserProfile, windowSize int) UserProfile {
+	now := time.Now()
+	threshold := now.Add(-time.Duration(windowSize) * time.Hour) // 计算窗口起点
+
+	newHistory := make(map[string]int)
+	for timestamp, count := range profile.QueryHistory {
+		t, err := time.Parse("2006-01-02 15", timestamp)
+		if err == nil && t.After(threshold) {
+			newHistory[timestamp] = count
+		}
+	}
+
+	profile.QueryHistory = newHistory
+	return profile
+}
+
+// 判断短期热用户 - 滑动窗口
+func (cs *ChunkStorage) IsHotUser(userID string) bool {
+	key := []byte(fmt.Sprintf("user_profile:%s", userID))
+
+	data, err := cs.db.Get(key, nil)
+	if err != nil {
+		return false
+	}
+
+	var profile UserProfile
+	_ = json.Unmarshal(data, &profile)
+
+	// 计算最近 `windowSize` 小时内的查询总数
+	windowSize := 24
+	totalRecentQueries := 0
+	now := time.Now()
+	threshold := now.Add(-time.Duration(windowSize) * time.Hour)
+
+	for timestamp, count := range profile.QueryHistory {
+		t, err := time.Parse("2006-01-02 15", timestamp)
+		if err == nil && t.After(threshold) {
+			totalRecentQueries += count
+		}
+	}
+
+	// 如果最近 24 小时内查询次数 >= 10，则判定为热用户
+	return totalRecentQueries >= UserHotThreshold
+}
+
+// 判断周期性热用户 - SMA
+func (cs *ChunkStorage) IsCyclicHotUser(userID string) bool {
+	key := []byte(fmt.Sprintf("user_profile:%s", userID))
+
+	data, err := cs.db.Get(key, nil)
+	if err != nil {
+		return false
+	}
+
+	var profile UserProfile
+	_ = json.Unmarshal(data, &profile)
+
+	// 获取当前小时
+	currentHour := time.Now().Hour()
+
+	// 如果当前小时的平均查询次数高于阈值，则判定为周期性热用户
+	cyclicThreshold := 5.0 // 自定义阈值
+	return profile.DailyPattern[currentHour] >= cyclicThreshold
+}
+
+// PreloadUserTransactions 预加载用户交易 触发 Lookahead 预加载
+func (cs *ChunkStorage) PreloadUserTransactions(userID string) {
+	key := []byte(fmt.Sprintf("user_profile:%s", userID))
+
+	data, err := cs.db.Get(key, nil)
+	if err != nil {
+		return
+	}
+
+	var profile UserProfile
+	_ = json.Unmarshal(data, &profile)
+
+	// **获取当前小时**
+	currentHour := time.Now().Hour()
+
+	// **如果当前小时是用户的历史高峰时段，触发 Lookahead**
+	if profile.DailyPattern[currentHour] >= 5 {
+		iter := cs.db.NewIterator(nil, nil)
+		defer iter.Release()
+
+		count := 0 // 限制最多预加载 10 笔交易
+		for iter.Next() {
+			keyStr := string(iter.Key())
+			if len(keyStr) > 9 && keyStr[:9] == "tx_index:" {
+				txHash := keyStr[9:]
+				txData := cs.GetTransaction(txHash)
+				if txData != nil {
+					cs.txCache.Add(txHash, txData)
+					count++
+					if count >= 10 { // 只预加载最近 10 笔交易
+						break
+					}
+				}
+			}
+		}
+	}
+}
+
+// GetTransaction 通过交易哈希获取交易
+func (cs *ChunkStorage) GetTransaction(txHash string) *TxCacheEntry {
+	txKey := []byte(fmt.Sprintf("tx_index:%s", txHash))
+	chunkIDBytes, err := cs.db.Get(txKey, nil)
+	if err != nil {
+		return nil
+	}
+	chunkID, _ := strconv.ParseUint(string(chunkIDBytes), 10, 64)
+
+	chunk, err := cs.loadChunk(chunkID)
+	if err != nil {
+		return nil
+	}
+
+	offset, ok := chunk.TxOffsets[txHash]
+	if !ok {
+		return nil
+	}
+
+	block := chunk.Blocks[offset.BlockNumber]
+	tx := block.Transactions[offset.TxIndex]
+
+	return &TxCacheEntry{Tx: &tx, Block: block}
+}
+
+// 马尔科夫链预测
+func (cs *ChunkStorage) PredictNextQuery(userID string) string {
+	key := []byte(fmt.Sprintf("user_profile:%s", userID))
+	data, err := cs.db.Get(key, nil)
+	if err != nil {
+		return ""
+	}
+
+	var profile UserProfile
+	_ = json.Unmarshal(data, &profile)
+
+	// **如果查询历史不足 3 次，不进行预测**
+	if len(profile.QuerySequence) < 3 {
+		return ""
+	}
+
+	// **取最近 2 笔查询**
+	lastTx2 := profile.QuerySequence[len(profile.QuerySequence)-2]
+	lastTx3 := profile.QuerySequence[len(profile.QuerySequence)-3]
+
+	// **遍历 QuerySequence，找 (Tx3, Tx2) → 预测的 TxX**
+	for i := 0; i < len(profile.QuerySequence)-3; i++ {
+		if profile.QuerySequence[i] == lastTx3 && profile.QuerySequence[i+1] == lastTx2 {
+			return profile.QuerySequence[i+2] // 预测的下一个交易
+		}
+	}
+
+	return ""
 }
